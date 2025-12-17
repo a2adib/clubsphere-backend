@@ -11,7 +11,8 @@ app.use(express.json());
 
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
-const uri = process.env.DB_URI; 
+const uri = `mongodb+srv://clubsphere:123456clubsphere@cluster0.by0ybnd.mongodb.net/?appName=Cluster0`;
+
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
@@ -25,6 +26,35 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+
+    const database = client.db("clubSphereDB");
+    const userCollection = database.collection("users");
+  
+    app.post('/users', async (req, res) => {
+        const userInfo = req.body;
+        console.log('Received user data:', userInfo);
+        userInfo.role = "member";
+        userInfo.createdAt = new Date();
+        try {
+            const result = await userCollection.insertOne(userInfo);
+            console.log('User data inserted:', result);
+            res.send(result);
+        } catch (error) {
+            console.error('Error inserting user data:', error);
+            res.status(500).send({ message: 'Error inserting user data', error });
+        }
+    });
+
+    app.get('/users/role/:email', async (req, res) => {
+        const {email} = req.params
+
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        
+        res.send(user);
+    });
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
