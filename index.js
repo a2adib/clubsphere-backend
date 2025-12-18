@@ -29,11 +29,11 @@ async function run() {
 
     const database = client.db("clubSphereDB");
     const userCollection = database.collection("users");
+    const clubCollection = database.collection("clubs");
   
     app.post('/users', async (req, res) => {
         const userInfo = req.body;
         console.log('Received user data:', userInfo);
-        userInfo.role = "member";
         userInfo.createdAt = new Date();
         try {
             const result = await userCollection.insertOne(userInfo);
@@ -52,6 +52,16 @@ async function run() {
         const user = await userCollection.findOne(query);
         
         res.send(user);
+    });
+
+    // add club API
+    app.post('/add-clubs', async (req, res) => {
+        const clubInfo = req.body;
+        console.log('Received club data:', clubInfo);
+        clubInfo.createdAt = new Date();
+        const result = await clubCollection.insertOne(clubInfo);
+        console.log('Club data inserted:', result);
+        res.send(result);
     });
 
 
