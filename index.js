@@ -55,7 +55,7 @@ async function run() {
     });
 
     // add club API
-    app.post('/add-clubs', async (req, res) => {
+    app.post('/clubs', async (req, res) => {
         const clubInfo = req.body;
         console.log('Received club data:', clubInfo);
         clubInfo.createdAt = new Date();
