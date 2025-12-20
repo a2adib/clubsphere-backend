@@ -11,6 +11,18 @@ app.use(express.json());
 
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const admin = require("firebase-admin");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+
+// const serviceAccount = require("./firebase-admin-key.json");
+
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
+
 const uri = `mongodb+srv://clubsphere:123456clubsphere@cluster0.by0ybnd.mongodb.net/?appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -29,7 +41,7 @@ async function run() {
 
     const database = client.db("clubSphereDB");
     const userCollection = database.collection("users");
-    const clubCollection = database.collection("clubs");
+    const requestCollection = database.collection("request");
   
     app.post('/users', async (req, res) => {
         const userInfo = req.body;
@@ -55,13 +67,11 @@ async function run() {
         res.send(user);
     });
 
-    // add club API
-    app.post('/clubs', async (req, res) => {
-        const clubInfo = req.body;
-        console.log('Received club data:', clubInfo);
-        clubInfo.createdAt = new Date();
-        const result = await clubCollection.insertOne(clubInfo);
-        console.log('Club data inserted:', result);
+    // add requests API
+    app.post('/requests', async (req, res) => {
+        const requestData = req.body;
+        requestData.createdAt = new Date();
+        const result = await requestCollection.insertOne(requestData);
         res.send(result);
     });
 
