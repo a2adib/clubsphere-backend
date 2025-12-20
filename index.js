@@ -33,7 +33,8 @@ async function run() {
   
     app.post('/users', async (req, res) => {
         const userInfo = req.body;
-        console.log('Received user data:', userInfo);
+        userInfo.role = 'donar';
+        userInfo.status = 'active'; 
         userInfo.createdAt = new Date();
         try {
             const result = await userCollection.insertOne(userInfo);
@@ -66,9 +67,10 @@ async function run() {
 
     app.get('/manager/clubs/:email', async (req, res) => {
         const {email} = req.params.email;
-        const query = { clubMangerEmail: email };
+        const query = { email: email };
         const result = await clubCollection.find(query).toArray();
         res.send(result);
+        console.log(result);
     });
 
 
