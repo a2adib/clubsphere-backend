@@ -90,6 +90,13 @@ async function run() {
         res.send(user);
     });
 
+    app.get('/users/:email', async (req, res) => {
+        const {email} = req.params.email;
+        const query = { email: email };
+        const result = await userCollection.findOne(query);
+        res.send(result);  
+    });
+
     // add requests API
     app.post('/requests', verifyFBToken, async (req, res) => {
         const requestData = req.body;
