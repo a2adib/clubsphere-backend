@@ -9,21 +9,39 @@ app.use(cors());
 app.use(express.json());
 
 
-
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const admin = require("firebase-admin");
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
-
-
-// const serviceAccount = require("./firebase-admin-key.json");
 
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
 const serviceAccount = JSON.parse(decoded);
 
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+ 
+
+// const serviceAccount = require("./firebase-admin-key.json");
+
+
 const uri = `mongodb+srv://clubsphere:123456clubsphere@cluster0.by0ybnd.mongodb.net/?appName=Cluster0`;
+
+
+const verifyFBToken = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).send({ message: 'Unauthorized access' });
+    }
+
+    try {
+        const token = authHeader.split(' ')[1];
+        const decodedUser = await admin.auth().verifyIdToken(token);
+        console.log('Decoded User:', decodedUser);
+        req.decodedEmail = decodedUser.email;
+        next();
+    } catch (error) {
+        return res.status(401).send({ message: 'Unauthorized access' });    
+    }
+}
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -68,7 +86,7 @@ async function run() {
     });
 
     // add requests API
-    app.post('/requests', async (req, res) => {
+    app.post('/requests', verifyFBToken, async (req, res) => {
         const requestData = req.body;
         requestData.createdAt = new Date();
         const result = await requestCollection.insertOne(requestData);
