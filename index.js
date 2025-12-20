@@ -63,7 +63,7 @@ async function run() {
   
     app.post('/users', async (req, res) => {
         const userInfo = req.body;
-        userInfo.role = 'donar';
+        userInfo.role = 'donor';
         userInfo.status = 'active'; 
         userInfo.createdAt = new Date();
         try {
