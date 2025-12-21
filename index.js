@@ -117,8 +117,14 @@ async function run() {
     
     app.get('/myrequests', verifyFBToken,  async (req, res) => {
         const email = req.decodedEmail;
+        const size = parseInt(req.query.size); 
+        const page = parseInt(req.query.page);
         const query = { requesterEmail: email };
-        const result = await requestCollection.find(query).toArray();
+        const result = await requestCollection
+        .find(query)
+        .limit(size )
+        .skip(size * page)
+        .toArray();
         res.send(result);
     });
 
