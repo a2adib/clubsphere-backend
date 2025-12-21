@@ -114,15 +114,13 @@ async function run() {
         res.send(result);
     });
 
-    app.get('/manager/clubs/:email', async (req, res) => {
-        const {email} = req.params.email;
-        const query = { email: email };
-        const result = await clubCollection.find(query).toArray();
+    
+    app.get('/myrequests', verifyFBToken,  async (req, res) => {
+        const email = req.decodedEmail;
+        const query = { requesterEmail: email };
+        const result = await requestCollection.find(query).toArray();
         res.send(result);
-        console.log(result);
     });
-
-
 
 
     // Send a ping to confirm a successful connection
