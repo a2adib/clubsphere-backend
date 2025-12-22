@@ -115,9 +115,9 @@ async function run() {
     });
 
     
-    app.get('/myrequests', verifyFBToken,  async (req, res) => {
+    app.get('/my-requests', verifyFBToken,  async (req, res) => {
         const email = req.decodedEmail;
-        const size = parseInt(req.query.size); 
+        const size = parseInt(req.query.limit); 
         const page = parseInt(req.query.page);
         const query = { requesterEmail: email };
         const result = await requestCollection
@@ -125,7 +125,10 @@ async function run() {
         .limit(size )
         .skip(size * page)
         .toArray();
-        res.send(result);
+
+        const totalRequest = await requestCollection.countDocuments(query);
+        
+        res.send({ request: result, totalRequest: totalRequest });
     });
 
 
