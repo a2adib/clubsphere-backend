@@ -140,7 +140,7 @@ async function run() {
         const amount = parseInt(information.donateAmount * 100 );
         
         
-        const session = await stripe.paymentIntents.create({
+        const session = await stripe.checkout.sessions.create({
             line_items: [
                 {
                     price_data: {
@@ -154,7 +154,7 @@ async function run() {
                 },
             ],
             mode: 'payment',
-            metadate:{
+            metadata:{
                 donorName: information.donorName,
             },
             customer_email: information.donorEmail,
