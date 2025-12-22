@@ -11,21 +11,22 @@ app.use(cors());
 app.use(express.json());
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const admin = require("firebase-admin");
+const { log } = require('console');
 
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
 const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+    credential: admin.credential.cert(serviceAccount)
 });
- 
+
 
 // const serviceAccount = require("./firebase-admin-key.json");
 
 
-const uri = `mongodb+srv://clubsphere:123456clubsphere@cluster0.by0ybnd.mongodb.net/?appName=Cluster0`;
+const uri = process.env.MONGODB_URI;
 
 
 const verifyFBToken = async (req, res, next) => {
@@ -41,138 +42,215 @@ const verifyFBToken = async (req, res, next) => {
         req.decodedEmail = decodedUser.email;
         next();
     } catch (error) {
-        return res.status(401).send({ message: 'Unauthorized access' });    
+        return res.status(401).send({ message: 'Unauthorized access' });
     }
 }
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
 });
 
 async function run() {
-  try {
-    // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    try {
+        // Connect the client to the server	(optional starting in v4.7)
+        //await client.connect();
 
-    const database = client.db("clubSphereDB");
-    const userCollection = database.collection("users");
-    const requestCollection = database.collection("request");
-  
-    app.post('/users', async (req, res) => {
-        const userInfo = req.body;
-        userInfo.role = 'donor';
-        userInfo.status = 'active'; 
-        userInfo.createdAt = new Date();
-        try {
-            const result = await userCollection.insertOne(userInfo);
-            console.log('User data inserted:', result);
-            res.send(result);
-        } catch (error) {
-            console.error('Error inserting user data:', error);
-            res.status(500).send({ message: 'Error inserting user data', error });
-        }
-    });
-
-    app.get('/users', verifyFBToken, async (req, res) => {
-        const result = await userCollection.find({}).toArray();
-        res.status(200).send(result);  
-    });
-
-    app.get('/users/role/:email', async (req, res) => {
-        const {email} = req.params
-
-        const query = { email: email };
-        const user = await userCollection.findOne(query);
-        
-        res.send(user);
-    });
-
-    app.get('/users/:email', async (req, res) => {
-        const {email} = req.params.email;
-        const query = { email: email };
-        const result = await userCollection.findOne(query);
-        res.send(result);  
-    });
-
-    app.patch('/update/user/status', verifyFBToken, async (req, res) => {
-        const {email, status} = req.query;
-        const query = { email: email };
-        const updateStatus = {
-            $set: { status: status }
-        };
-        const result = await userCollection.updateOne(query, updateStatus);
-        res.send(result);
-    });
-    // add requests API
-    app.post('/requests', verifyFBToken, async (req, res) => {
-        const requestData = req.body;
-        requestData.createdAt = new Date();
-        const result = await requestCollection.insertOne(requestData);
-        res.send(result);
-    });
-
-    
-    app.get('/my-requests', verifyFBToken,  async (req, res) => {
-        const email = req.decodedEmail;
-        const size = parseInt(req.query.limit); 
-        const page = parseInt(req.query.page);
-        const query = { requesterEmail: email };
-        const result = await requestCollection
-        .find(query)
-        .limit(size )
-        .skip(size * page)
-        .toArray();
-
-        const totalRequest = await requestCollection.countDocuments(query);
-        
-        res.send({ request: result, totalRequest: totalRequest });
-    });
-
-
-    // payment 
-    app.post('/create-payment-checkout', async (req, res) => {
-        const information = req.body;
-        const amount = parseInt(information.donateAmount * 100 );
-        
-        
-        const session = await stripe.checkout.sessions.create({
-            line_items: [
-                {
-                    price_data: {
-                        currency: 'usd',
-                        unit_amount: amount,
-                        product_data: {
-                            name: 'Please Donation',
-                        },
-                    }, 
-                    quantity: 1,
-                },
-            ],
-            mode: 'payment',
-            metadata:{
-                donorName: information.donorName,
-            },
-            customer_email: information.donorEmail,
-            success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`, 
-            cancel_url: `${process.env.SITE_DOMAIN}/payment-failed`,           
+        const database = client.db("clubSphereDB");
+        const userCollection = database.collection("users");
+        const requestCollection = database.collection("request");
+        const paymentCollection = database.collection("payments")
+        app.post('/users', async (req, res) => {
+            const userInfo = req.body;
+            userInfo.role = 'donor';
+            userInfo.status = 'active';
+            userInfo.createdAt = new Date();
+            try {
+                const result = await userCollection.insertOne(userInfo);
+                console.log('User data inserted:', result);
+                res.send(result);
+            } catch (error) {
+                console.error('Error inserting user data:', error);
+                res.status(500).send({ message: 'Error inserting user data', error });
+            }
         });
 
-        res.send({ url: session.url });
+        app.get('/users', verifyFBToken, async (req, res) => {
+            const result = await userCollection.find({}).toArray();
+            res.status(200).send(result);
+        });
 
-    })
+        app.get('/users/role/:email', async (req, res) => {
+            const { email } = req.params
 
-    // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
-    // Ensures that the client will close when you finish/error
-    //await client.close();
-  }
+            const query = { email: email };
+            const user = await userCollection.findOne(query);
+
+            res.send(user);
+        });
+
+        app.patch('/users/role', verifyFBToken, async (req, res) => {
+            const { email, role } = req.query;
+            const query = { email: email };
+            const updateRole = {
+                $set: { role: role }
+            };
+            const result = await userCollection.updateOne(query, updateRole);
+            res.send(result);
+        });
+        
+        app.get('/all-requests', verifyFBToken, async (req, res) => {
+            const result = await requestCollection.find({}).toArray();
+            res.status(200).send(result);
+        });
+
+
+        app.get('/users/:email', async (req, res) => {
+            const { email } = req.params.email;
+            const query = { email: email };
+            const result = await userCollection.findOne(query);
+            res.send(result);
+        });
+        
+        app.patch('/users/:email', verifyFBToken, async (req, res) => {
+            const { email } = req.params;
+            const query = { email: email };
+            const updateDoc = {
+                $set: req.body
+            };
+            const result = await userCollection.updateOne(query, updateDoc);
+            res.send(result);
+        })
+
+        app.patch('/update/user/status', verifyFBToken, async (req, res) => {
+            const { email, status } = req.query;
+            const query = { email: email };
+            const updateStatus = {
+                $set: { status: status }
+            };
+            const result = await userCollection.updateOne(query, updateStatus);
+            res.send(result);
+        });
+        // add requests API
+        app.post('/requests', verifyFBToken, async (req, res) => {
+            const requestData = req.body;
+            requestData.createdAt = new Date();
+            const result = await requestCollection.insertOne(requestData);
+            res.send(result);
+        });
+        
+        app.patch('/requests/:id', verifyFBToken, async (req, res) => {
+            const { id } = req.params;
+            const query = { _id: new ObjectId(id) };
+            const updateDoc = {
+                $set: req.body
+            };
+            const result = await requestCollection.updateOne(query, updateDoc);
+            res.send(result);
+        });
+        
+        app.delete('/requests/:id', verifyFBToken, async (req, res) => {
+            const { id } = req.params;
+            const query = { _id: new ObjectId(id) };
+            const result = await requestCollection.deleteOne(query);
+            res.send(result);
+        });
+
+
+        app.get('/my-requests', verifyFBToken, async (req, res) => {
+            const email = req.decodedEmail;
+            const size = parseInt(req.query.limit);
+            const page = parseInt(req.query.page);
+            const query = { requesterEmail: email };
+            const result = await requestCollection
+                .find(query)
+                .limit(size)
+                .skip(size * page)
+                .toArray();
+
+            const totalRequest = await requestCollection.countDocuments(query);
+
+            res.send({ request: result, totalRequest: totalRequest });
+        });
+
+
+        // payment 
+        app.post('/create-payment-checkout', async (req, res) => {
+            const information = req.body;
+            const amount = parseInt(information.donateAmount * 100);
+
+
+            const session = await stripe.checkout.sessions.create({
+                line_items: [
+                    {
+                        price_data: {
+                            currency: 'usd',
+                            unit_amount: amount,
+                            product_data: {
+                                name: 'Please Donation',
+                            },
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: 'payment',
+                metadata: {
+                    donorName: information.donorName,
+                },
+                customer_email: information.donorEmail,
+                success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.SITE_DOMAIN}/payment-failed`,
+            });
+
+            res.send({ url: session.url });
+
+        })
+        
+        app.get('/payments', verifyFBToken, async (req, res) => {
+            const result = await paymentCollection.find({}).toArray();
+            res.status(200).send(result);
+        })
+
+        app.post('/success-payment', async (req, res) => {
+            const { session_id } = req.query;
+            const session = await stripe.checkout.sessions.retrieve(
+                session_id
+            );
+            console.log(session);
+            
+            const transactionId = session.payment_intent;
+
+            const isPaymentExist = await paymentCollection.find({transactionId})
+
+
+            if(isPaymentExist){
+                return
+            }
+
+            if(session.payment_status== 'paid'){
+                const paymentInfo ={
+                    amount: session.amount_total/100,
+                    currency: session.currency,
+                    donarEmail: session.customer_email,
+                    transactionId,
+                    payment_status: session.payment_status,
+                    paidAt: new Date()
+                }
+                const result = await paymentCollection.insertOne(paymentInfo)
+                return res.send(result)
+            }
+        })
+        // Send a ping to confirm a successful connection
+        //await client.db("admin").command({ ping: 1 });
+        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    } finally {
+        // Ensures that the client will close when you finish/error
+        //await client.close();
+    }
 }
 run().catch(console.dir);
 
